@@ -22,8 +22,14 @@ pub mod staker {
     pub fn stake(
         ctx: Context<Stake>,
         stake_mint_authority_bump: u8,
+        program_beef_bag_bump: u8,
         beef_amount: u64
     ) -> Result<()> {
+
+
+        // ************************************************************
+        // 1. Ask SPL Token Program to mint 🥩 to the user.
+        // ************************************************************
 
         let stake_amount = beef_amount; // ???? FOR NOW!!!
 
@@ -48,6 +54,22 @@ pub mod staker {
             &signer
         );
         token::mint_to(cpi_ctx, stake_amount)?;
+
+
+
+        // ************************************************************
+        // 2. Ask SPL Token Program to transfer 🐮 from the user.
+        // ************************************************************
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            token::Transfer {
+                from: ctx.accounts.user_beef_token_bag.to_account_info(),
+                authority: ctx.accounts.user_beef_token_bag_authority.to_account_info(),
+                to: ctx.accounts.program_beef_token_bag.to_account_info(),
+            }
+        );
+        token::transfer(cpi_ctx, beef_amount)?;
+
 
         Ok(())
     }
@@ -96,7 +118,7 @@ pub struct CreateBeefTokenBag<'info> {
 
 
 #[derive(Accounts)]
-#[instruction(stake_mint_authority_bump: u8)]
+#[instruction(stake_mint_authority_bump: u8, program_beef_bag_bump: u8)]
 pub struct Stake<'info> {
     // SPL Token Program
     pub token_program: Program<'info, Token>,
@@ -125,4 +147,32 @@ pub struct Stake<'info> {
     // Associated Token Account 💰 for User to receive 🥩
     #[account(mut)]
     pub user_stake_token_bag: Account<'info, TokenAccount>,
+
+
+
+
+    // ***********
+    // TRANSFER
+    // ***********
+
+    // Associated Token Account for User which holds 🐮.
+    #[account(mut)]
+    pub user_beef_token_bag: Account<'info, TokenAccount>,
+
+    // The authority allowed to mutate the above ⬆️
+    pub user_beef_token_bag_authority: Signer<'info>,
+
+    // Used to receive 🐮 from users
+    #[account(
+        mut,
+        seeds = [ beef_mint.key().as_ref() ],
+        bump = program_beef_bag_bump,
+    )]
+    pub program_beef_token_bag: Account<'info, TokenAccount>,
+
+    // Require for the PDA above ⬆️
+    #[account(
+        address = BEEF_MINT_ADDRESS.parse::<Pubkey>().unwrap(),
+    )]
+    pub beef_mint: Box<Account<'info, Mint>>,
 }
