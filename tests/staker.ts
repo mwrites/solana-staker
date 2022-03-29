@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import * as anchor from "@project-serum/anchor";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import {
   stakeMintAddress,
@@ -11,6 +11,7 @@ import {
 import { User } from "./user";
 import { createMints } from "../scripts/create-mints";
 import { airdropBeef } from "../scripts/airdrop-beef";
+import { TokenHelper } from "./token_helper";
 
 
 
@@ -21,6 +22,27 @@ describe("staker", () => {
     await airdropBeef();
   });
 
+
+  it('It creates the program 🐮💰 beef token bag', async () => {
+    const user = new User();
+    const [beefPDA, _] = await getProgramBeefTokenBagPDA();
+
+    await program.rpc.createBeefTokenBag({
+      accounts: {
+        beefMint: beefMintAddress,
+        programBeefTokenBag: beefPDA,
+        payer: user.wallet.publicKey,
+
+        // Solana is lost: where are my spl program friends?
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        rent: SYSVAR_RENT_PUBKEY,
+      }
+    });
+
+    const tokenHelper = new TokenHelper(beefMintAddress);
+    expect(await tokenHelper.balance(beefPDA)).to.be.eql(0);
+  });
 
 
   it('Swap $🐮 for $🥩', async () => {
@@ -43,6 +65,11 @@ describe("staker", () => {
             // Solana is lost: where are my spl program friends?
             tokenProgram: TOKEN_PROGRAM_ID,
 
+
+            // **************
+            // MINT
+            // **************
+
             // Token Program asks: 🏭 what type of token am I supposed to print?
             stakeMint: stakeMintAddress,
 
@@ -51,6 +78,14 @@ describe("staker", () => {
 
             // 💰🥩 Token Program wonders: "where should I mint this to?"
             userStakeTokenBag: user.stakeTokenBag,
+
+
+
+            // **************
+            // TRANSFER
+            // **************
+
+
           },
         },
     );

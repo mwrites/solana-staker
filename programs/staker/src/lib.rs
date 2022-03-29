@@ -13,6 +13,11 @@ pub mod staker {
 
     use super::*;
 
+    pub fn create_beef_token_bag(
+        ctx: Context<CreateBeefTokenBag>
+    ) -> Result<()> {
+        Ok(())
+    }
 
     pub fn stake(
         ctx: Context<Stake>,
@@ -46,6 +51,46 @@ pub mod staker {
 
         Ok(())
     }
+}
+
+
+
+#[derive(Accounts)]
+pub struct CreateBeefTokenBag<'info> {
+    // 1. PDA (so pubkey) for the soon-to-be created beef token bag for our program.
+    #[account(
+        init,
+        payer = payer,
+
+        // We use the token mint as a seed for the mapping -> think "HashMap[seeds+bump] = pda"
+        seeds = [ BEEF_MINT_ADDRESS.parse::<Pubkey>().unwrap().as_ref() ],
+        bump,
+
+        // Token Program wants to know what kind of token this token bag is for
+        token::mint = beef_mint,
+
+        // It's a PDA so the authority is itself!
+        token::authority = program_beef_token_bag,
+    )]
+    pub program_beef_token_bag: Account<'info, TokenAccount>,
+
+
+    // 2. The mint 🐮🪙 because it's needed from above ⬆️ token::mint = ...
+    #[account(
+        address = BEEF_MINT_ADDRESS.parse::<Pubkey>().unwrap(),
+    )]
+    pub beef_mint: Account<'info, Mint>,
+
+
+    // 3. The rent payer
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+
+    // 4. Needed from Anchor for the creation of an Associated Token Account
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
 
