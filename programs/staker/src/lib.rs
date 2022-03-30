@@ -31,7 +31,7 @@ pub mod staker {
         // 1. Ask SPL Token Program to mint 🥩 to the user.
         // ************************************************************
 
-        let stake_amount = beef_amount; // ???? FOR NOW!!!
+        let stake_amount = beef_amount; // TODO: Change the formula
 
         // We know that:
         //                                  findPDA(programId + seed)
@@ -70,6 +70,54 @@ pub mod staker {
         );
         token::transfer(cpi_ctx, beef_amount)?;
 
+
+        Ok(())
+    }
+
+
+    pub fn unstake(
+        ctx: Context<UnStake>,
+        program_beef_bag_bump: u8,
+        stake_amount: u64
+    ) -> Result<()> {
+
+        // ************************************************************
+        // 1. Ask SPL Token Program to burn user's 🥩.
+        // ************************************************************
+
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            token::Burn {
+                mint: ctx.accounts.stake_mint.to_account_info(),
+                to: ctx.accounts.user_stake_token_bag.to_account_info(),
+                authority: ctx.accounts.user_stake_token_bag_authority.to_account_info(),
+            },
+        );
+        token::burn(cpi_ctx, stake_amount)?;
+
+
+
+        // ************************************************************
+        // 2. Ask SPL Token Program to transfer back 🐮 to the user.
+        // ************************************************************
+
+        // See why we did this in `fn stake()`
+        let beef_mint_address= ctx.accounts.beef_mint.key();
+        let seeds = &[beef_mint_address.as_ref(), &[program_beef_bag_bump]];
+        let signer = [&seeds[..]];
+
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            token::Transfer {
+                from: ctx.accounts.program_beef_token_bag.to_account_info(),
+                authority: ctx.accounts.program_beef_token_bag.to_account_info(),
+                to: ctx.accounts.user_beef_token_bag.to_account_info()
+            },
+            &signer
+        );
+
+        let beef_amount = stake_amount; // TODO: Change the formula
+        token::transfer(cpi_ctx, beef_amount)?;
 
         Ok(())
     }
@@ -125,7 +173,7 @@ pub struct Stake<'info> {
 
 
     // ***********
-    // MINT
+    // MINTING 🥩 TO USERS
     // ***********
 
     // Address of the stake mint 🏭🥩
@@ -152,7 +200,7 @@ pub struct Stake<'info> {
 
 
     // ***********
-    // TRANSFER
+    // TRANSFERING 🐮 FROM USERS
     // ***********
 
     // Associated Token Account for User which holds 🐮.
@@ -169,6 +217,57 @@ pub struct Stake<'info> {
         bump = program_beef_bag_bump,
     )]
     pub program_beef_token_bag: Account<'info, TokenAccount>,
+
+    // Require for the PDA above ⬆️
+    #[account(
+        address = BEEF_MINT_ADDRESS.parse::<Pubkey>().unwrap(),
+    )]
+    pub beef_mint: Account<'info, Mint>,
+}
+
+
+#[derive(Accounts)]
+#[instruction(program_beef_bag_bump: u8)]
+pub struct UnStake<'info> {
+    // SPL Token Program
+    pub token_program: Program<'info, Token>,
+
+
+    // ***********
+    // BURNING USER'S 🥩
+    // ***********
+
+    // see `token::Burn.mint`
+    #[account(
+        mut,
+        address = STAKE_MINT_ADDRESS.parse::<Pubkey>().unwrap(),
+    )]
+    pub stake_mint: Account<'info, Mint>,
+
+    // see `token::Burn.to`
+    #[account(mut)]
+    pub user_stake_token_bag: Account<'info, TokenAccount>,
+
+    // The authority allowed to mutate the above ⬆️
+    pub user_stake_token_bag_authority: Signer<'info>,
+
+
+
+    // ***********
+    // TRANSFER 🐮 TO USERS
+    // ***********
+
+    // see `token::Transfer.from`
+    #[account(
+        mut,
+        seeds = [ beef_mint.key().as_ref() ],
+        bump = program_beef_bag_bump,
+    )]
+    pub program_beef_token_bag: Account<'info, TokenAccount>,
+
+    // see `token::Transfer.to`
+    #[account(mut)]
+    pub user_beef_token_bag: Account<'info, TokenAccount>,
 
     // Require for the PDA above ⬆️
     #[account(
