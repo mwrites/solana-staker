@@ -72,7 +72,7 @@ We will make an attempt to the minting part which will lead us to discover sever
 3. [Associated Token Accounts](https://spl.solana.com/associated-token-account).
 4. [Cross-Program Invocations](https://docs.solana.com/developing/programming-model/calling-between-programs).
 
-The preparation of these ingredients will be 80% of the work, as these are the core skills needed to make other recipes. So most of our effort  will be to understand and prepare these ingredients to complete the minting part. The transfer will be cover in [part 2](https://blog.mwrites.xyz/solana-staking-program-part2).
+The preparation of these ingredients will be 80% of the work, as these are the core skills needed to make other recipes. So most of our effort  will be to understand and prepare these ingredients to complete the minting part. The transfer will be cover in part 2 (i need to find the link to that part2 lol)
 
 ---
 
