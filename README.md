@@ -72,7 +72,7 @@ We will make an attempt to the minting part which will lead us to discover sever
 3. [Associated Token Accounts](https://spl.solana.com/associated-token-account).
 4. [Cross-Program Invocations](https://docs.solana.com/developing/programming-model/calling-between-programs).
 
-The preparation of these ingredients will be 80% of the work, as these are the core skills needed to make other recipes. So most of our effort  will be to understand and prepare these ingredients to complete the minting part. The transfer will be cover in part 2 (i need to find the link to that part2 lol)
+The preparation of these ingredients will be 80% of the work, as these are the core skills needed to make other recipes. So most of our effort  will be to understand and prepare these ingredients to complete the minting part. The transfer will be cover in part 2.
 
 ---
 
@@ -920,6 +920,530 @@ Because of these two reasons, accounts introduce a new depth. For example, when 
 The equivalent to ERC20 contracts in Solana is SPL Tokens. However, SPL Tokens are not smart contracts but accounts. So instead of creating a new smart contract (program), we register a new account that defines our token with the SPL Token Program, the centralized authority for managing tokens.
 
 
+
+
+
+
+## Let's Pair-Progra-Cook A Solana Staking Program - Part 2
+
+# 📺 Previously In Hell's Kitchen
+
+
+This is part 2 of the [staking program](https://blog.mwrites.xyz/solana-staking-program). We are still trying to achieve the core staking feature. By trying to implement the minting part, we learned how to chop and slice token mints, token bags, CPI signing, etc... Thanks to that, we will be able to move much faster now!
+
+>  Remember, if you are an Etherean, ex etherean, or cyborg etherean-solanian 😁, please jump to the [EVM Comparison](https://blog.mwrites.xyz/solana-staking-program-part2#heading-review-andamp-evm-comparison) and copy-paste the section somewhere, and keep it along with you as you follow the article. That section was separated on purpose as I am not sure how many of you have the double skills.
+
+Let's do the second part of the staking. We now need to transfer $beef tokens from the user.
+![staking-flow-transfer.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648666462023/Cs-9w-CbM.png)
+
+
+
+# 👓 DO THIS FIRST: Zoom In
+
+**Please, please  `CMD + +`, or `view -> zoom in` at least two or three times in your browser. Unfortunately, hashnode keeps the reading area ridiculously small, even on huge screens, making the screenshots unreadable.**
+
+**Or, right-click on the screenshots and open in the new tab.**
+
+I had previously added the full code in text directly in the article, but it was just impossible to follow given the length of the code! So I decided to go for side-by-side screenshots instead. Also because of accounts, it's way better to see side by side, what your program API expects and what accounts you need to prepare on the client side.
+
+Maybe in the future, I will consider using another platform. I am thinking about a two-view or three-view side by side to look at rust, js, and diagram at the same time.
+
+
+
+# 👨🏻‍🍳 Tonight The Chef Propose
+
+**Humans have two faces, and Solanians have three.**
+
+Remember, to fully understand how a Solana program works. We better try to look at it from different glasses 👓:
+
+- The deployment part.
+- The client-side.
+- The program itself.
+
+
+**1 Pair-Progra-Cooking The Minting Feature:**
+
+*This was done in part 1.*
+
+**2 Completing the staking with the $beef transfer:**
+
+In this episode, we will make users pay $beef!
+
+**3. Unstake:**
+
+Finally, we will learn how to do the inverse operation of staking.
+
+
+# 🍭 TL;DR - [Github](https://github.com/mwrites/solana-staker)
+We are still looking at the same repo, the code in this article is not exhaustive. Instead, it will illustrate the important pieces so that you develop the mental model to build a DeFi program yourself in the future.
+
+Please don't try to copy-paste any of the code here. It probably won't compile. I have reduced the noise on purpose. However, the complete code is available [here](https://github.com/mwrites/solana-staker). Feel free to look at it along with the article or clone it locally and try it.
+
+
+#  🐮 Transfering Beef From Users
+
+### 🥒 Fourth Ingredient - Airdrop 💧
+
+**Got some beef?**
+
+Previously we have already created the🐮 token mint. Our tokens now exist in the blockchain (at least in our local ledger). It is not time to work on our program yet. Why? Our staker program takes $beef tokens and rewards our users with stake tokens. But how do users get $beef in the first place?
+
+Have you ever noticed that almost all DeFi apps have a swap feature on the home page? So if we were to build a complete DeFi app, users would start by swapping their $sol for 🐮 tokens. Then they would be able to stake their 🐮 tokens.
+
+![orca-swap](https://cdn.hashnode.com/res/hashnode/image/upload/v1648666515914/uRYGltdHk.png)
+*[Orca Swap](https://www.orca.so/)*
+
+
+**Airdrop**
+
+Since we are in Solana, users usually start with $sol, so when they go to our Staking or DEX  application, users would first need to swap their $sol for another crypto token. **To simplify this article and make testing easier, we will just airdrop the 🐮 tokens directly to users.**
+
+For our tests, we are using ourselves as guinea pig users. So you or I will be the one receiving the 🐮 tokens.
+
+> This part is not crucial to the article. However, if you want, look at  `scripts/airdrop-beef.ts` to understand how to do it.
+
+So, we usually would airdrop $beef to users before they arrive in our application. So, let's do that in the tests:
+
+```
+import { airdropBeef } from "../scripts/airdrop-beef";
+
+
+
+describe("staker program", () => {  
+  
+    before(async () => {  
+        await createMints();
+        await airdropBeef();
+	 });
+
+
+	it('Swap $🐮 for $🥩', async () => {
+		...
+	}
+}
+```
+
+
+**🏆 Achievement: Airdroping 🐮**
+
+- Users now have 🐮 in their wallets. 
+- All the preparation to finish the stake function is now done!
+
+
+### 🐮💰 Your Program Also Wants Gucci
+
+![rusty](https://cdn.hashnode.com/res/hashnode/image/upload/v1648666558061/Z4PWBDqem.png)
+
+💪 From now on, we don't need to do additional deployment stuff. We can solely focus on our staker program.
+
+One more thing before we let users send 🐮 to us, we need a beef token bag for our program. As users need token bags to hold tokens, programs also need token bags. So let's create one for our program. Since the program will own the token bag account, we will be using a [Program Derived Address](https://blog.mwrites.xyz/solana-what-is-a-program-derived-address) mapped to the address of the beef mint. 
+
+#### Rust
+
+On the left side, the implementation is virtually empty, because thanks to Anchor we can do all the work with the macros when defining `Context<CreateBeefTokenBag`.
+
+![part2-code-transfer-create-beef-bag-rust.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648707413352/_u6AY_mYV.png)
+
+The program token bag will be created with the `CreateBeefTokenBag` instruction:
+- We are creating an account from a PDA, you know this already!
+- This time, the `bump` is not necessary.
+
+  
+
+#### Deployment - Creating The Bag Account
+
+- Left side: remember, with Solana, we need to prepare the addresses of the accounts ahead of time and feed them to our program. PDAs are "found" instead of created, so let's find that address. 
+- Right side: we create an account with that program-derived address, all the other accounts are just dependencies of that `program_beef_token_bag`.
+
+![part2-code-transfer-create-beef-bag-js](https://cdn.hashnode.com/res/hashnode/image/upload/v1648708210979/mRCLhtpx0.png)
+Let's look at the left side:
+- This time, the `bump` is not necessary.
+- `payer`: Solana wonders: *" and who is gonna pay for that token bag account space?"*
+
+* The rest are required by Token Program, as we saw when we defined the `Context<CreateBeefTokenBag>.`
+
+
+
+>  In real life (what is real life?), you would actually do this in an Anchor deployment script.
+
+
+
+
+Run the test👏  `anchor test`:
+
+```shell
+    ✔ It creates the program 🐮💰 beef token bag (615ms)
+    ✔ Swap $🐮 for $🥩 (1701ms)
+
+
+  2 passing (7s)
+```
+
+
+
+**🏆 Achievement:**
+
+- We created a token bag for our program to receive 🐮 from the user.
+- Our program can now receive and store 🐮 beef tokens.
+
+
+
+### 🏗 An Attempt To Transfer
+
+Similarly to what we did for the mint instruction with the token program, let's see what the transfer looks like:
+
+```rust
+let cpi_ctx = CpiContext::new(  
+	ctx.accounts.token_program.to_account_info(),  
+	token::Transfer {  
+		from: // from which token bag?
+		authority: // do you have the authority to withdraw from ⬆️ ? 
+		to: // to which token bag?
+	}  
+);  
+token::transfer(cpi_ctx, beef_amount)?;
+
+```
+
+- `from`: is the token bag to withdraw from, meaning the user 🐮 token bag.
+- `authority`: is the authority for `from.` Solana wants to make sure we are not stealing from the users without their consent!
+- `to`: is the program token bag we will need to create below.
+
+
+
+😌 No need for a checklist this time. We already have all the ingredients necessary. We will complete all these arguments at once!
+
+
+
+
+### 🐮 Withdrawing $Beef From Users
+
+#### Rust - `token::Transfer`
+
+The left side is our implementation and the right side is the `Context<Stake>` accounts we need to define:
+
+![part2-code-transfer-transfer-rust.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648705410241/2gvpGhIy6.png)
+
+- `program_beef_token_bag`: you know the dance now, it's a PDA seeded with a mint address.
+- (right), note the additional `#[instruction(stake_mint_authority_bump: u8, program_beef_bag_bump: u8)]`.
+- (left), and also in the function: `stake(ctx: Context<Stake>, stake_mint_authority_bump: u8,  program_beef_bag_bump: u8)`
+
+
+
+#### Shall We... Test?
+
+
+![part2-code-transfer-transfer-js.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648707082571/QmX01ZoDO.png)
+
+
+
+> *Later, if you are curious about the helpers, look at the `scripts` folder.
+
+
+
+
+Run the `anchor test`:
+
+```shell
+🐮 beef Mint Address: AXyTBL1C48WEdpzpY4bc...
+🥩️ stake Mint Address: 9FgzyMYYiQew42BdVjs...
+🐮 Token Account 💰'8rn1qnW1QivKinta8rmDHsyV...' balance: 1000000000
+    ✔ It creates the program 🐮💰 beef token bag (552ms)
+    ✔ Swap $🐮 for $🥩 (2280ms)
+
+
+  2 passing (8s)
+```
+
+
+
+Checkpoint code in this branch: https://github.com/mwrites/solana-staker/tree/feature/stake-transfer-program-beef-token-bag.
+
+
+
+### 🏆 Achievement: Transfer
+
+😌😌😌 Phew... We finally put all the pieces together, the staking feature finally works!!!
+
+- We had to get a little help from the airdrop function to get users some 🐮.
+- Once users had 🐮, we noticed that the program also needed a 🐮 token bag to store SPL tokens.
+- After that, we were already familiar with all the 🥒 previous ingredients, mint, PDA, and token bags, so we could finish it in one straight line.
+
+🚀🌈👏  Huge job on getting to this checkpoint!!! We are basically done. There are no more ingredients or detours to learn about. The rest is just finishing the job.
+
+
+
+---
+
+
+
+# 🏁 Final Lap - Unstake / Redeem
+
+Now, we need to do all of this but in reverse. So what does the Unstake / Redeem of 🥩 actually do?
+
+- It should not mint but burn the received 🥩.
+
+- It should transfer back 🐮 to users.
+
+  
+
+### 🏗 An Attempt to UnStake
+
+Here's what the `token::Burn` instruction for the Token Program looks like:
+
+```rust
+token::Burn {  
+	mint: // what type of token is this?
+	to: // who is burning token?
+	authority: // who get the right to burn these?
+},
+```
+
+
+
+###  🔥 Burning Users' $Stakes
+
+* Left side: implementation.
+* Right side: what kind of accounts the API expects.
+
+![part2-code-unstake-burn-rust.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648706164939/OPckgAsJR.png)
+
+Let's discuss `token::Burn` (left side):
+
+- `to`: I would have called it a `from` as in "token bag to burn from" instead, but basically, that's the token bag we want to burn.
+
+- `authority`: Solana wants to make sure the person who is unstaking also controls that token bag.
+
+  
+
+
+###  🤠 Refunding $Beef To Users
+
+**Rust-Side**
+
+
+
+For the transfer, it's pretty much the same thing we did for the stake but inversing the recipient and the destination. On the left side, we do the implementation and on the right side we define the `Context<UnStake>`:
+
+![part2-code-unstake-transfer-rust.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648706309351/oHljt1S7C.png)
+
+- The `Context<UnStake>`, is a little similar to the Stake's one but we are mostly interested about beef mint and beef bags this time.
+
+
+
+Let's zoom in, on the signing, it's quite similar to what we did in `fn stake()` just using `beef_mint` and `beef_token_bag` instead:
+
+```rust
+  // PDA Signing: same as how we did  in `fn stake()`  
+let stake_mint_address= ctx.accounts.beef_mint.key();  
+let seeds = &[beef_mint_address.as_ref(), &[program_beef_bag_bump]];  
+let signer = [&seeds[..]];  
+  
+let cpi_ctx = CpiContext::new_with_signer(  // NEW
+	 ctx.accounts.token_program.to_account_info(),  
+	 token::Transfer {  
+		 from: ctx.accounts.program_beef_token_bag.to_account_info(),  
+		 authority: ctx.accounts.program_beef_token_bag.to_account_info(),  
+		 to: ctx.accounts.user_beef_token_bag.to_account_info()  
+	 },  
+	 &signer  
+);
+```
+
+- `CpiContext::new_with_signer`: when we did the transfer call in `stake,` we needed the user's signature. Since the token comes from the vault, we need the program to sign this time.
+
+
+
+**Client-Side**
+
+We can look at the right side, to see what are the expected accounts. So that, on the left side, we prepare the addresses of the accounts and feed them to the program:
+
+
+![part2-code-unstake-js.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648706709411/3ToaNYczq.png)
+
+
+
+ `anchor tests`:
+
+ ```shell
+ 🐮 beef Mint Address: AXyTBL1C48WEdpzpY...
+🥩️ stake Mint Address: 9FgzyMYYiQew42BdVjsK...
+🐮 Token Account 💰'8rn1qnW1QivKinta8rmDH...' balance: 1000000000
+    ✔ It creates the program 🐮💰 beef token bag (531ms)
+    ✔ Swaps $🐮 for $🥩 (2090ms)
+    ✔ It redeems 🥩 for 🐮 (1557ms)
+
+
+  3 passing (8s)
+ ```
+
+Checkpoint code is in this branch: https://github.com/mwrites/solana-staker/tree/feature/unstake.
+
+
+
+---
+
+
+
+# 🎬 And Cut
+
+Tremendous job on making it! 💪
+
+Users can now stake and unstake tokens. The only remaining part is the math on how to distribute tokens. One easy solution is to just divide by the total supply, but other ways exist. I will let you figure out this part.
+
+We started from a draft of the minting which led us to learn about several ingredients that we needed:
+
+1. Creating a Mint.
+2. Signing with a PDA.
+3. Associated Token Accounts.
+
+These 🥒 ingredients will be the foundation of your core skills which you can use to make new recipes apps!
+
+Learning how to prepare and chop these ingredients was the most challenging part, but after mastering these, we were able to quickly unroll the rest, the transfer, and the redeeming feature.
+
+🌈 Going further, the front-end is basically done. You just have to take the js code from the tests and let users connect their wallets with a [wallet-adapter](https://github.com/solana-labs/wallet-adapter). Not sure how to do it? 
+- Take a look at this [front-end walkthrough](https://blog.mwrites.xyz/solana-dapp-frontendl). You also might want to add the swap feature and avoid the awkward $beef airdrop we did.
+- Or you can try to let users stake $sol instead of 🐮, try to implement it, and see what's different about staking $sol.
+- Also, you might want to name your token by adding token, Jacob Creech explains [how to use the metaplex token metadata standard](https://github.com/jacobcreech/Token-Creator#adding-the-token-metadata)
+
+Grab a coffee, a beer, water, look at the sunshine take a breath, pat yourself, look at how handsome or pretty you are in the mirror 🤩. Then, come back for the next sections below!
+
+
+
+---
+
+
+
+# 🎓 Review & EVM Comparison
+
+**The Consequence Of Accounts**
+
+Comparing with the [solidity version](https://solidity-by-example.org/defi/staking-rewards/). You might notice that the Solana version is much more involved. If we can resume it in one word, that word is *Accounts*. You might have seen the phrase *" Solana programs are stateless"*. It took me a while to really, I mean, really understand what this involves. Basically, it means programs are dumb!
+
+So, programs don't know anything. They are just machine processing data. So when you want to talk to programs, you want them to process something. But they have no idea what data you are talking about, so because of that, you need to always provide everything to these processors:
+
+1. The first consequence of this is that data (accounts) need to be provided with each instruction, which makes the code longer to write.
+2. The second consequence is that because accounts are independent of programs, they need to be signed for access control, which again makes the code longer to write.
+
+**It's not a program->accounts, it's program->accounts->signer**
+
+Because of these two reasons, accounts introduce a new depth. For example, when you want to talk to a program, you want to give an account and not only the account but also the account's signer. So whenever you want to do something, you first need to get the accounts and make sure you have the appropriate signing in place. Then, finally, you can do something with the account.
+
+
+**ERC20 Contracts**
+
+The equivalent to ERC20 contracts in Solana is SPL Tokens. However, SPL Tokens are not smart contracts but accounts. So instead of creating a new smart contract (program), we register a new account that defines our token with the SPL Token Program, the centralized authority for managing tokens.
+
+
+**Associated Token Accounts or Token Bags**
+
+While in EVM, token balance is handled by the ERC20 smart contract, it is not managed by a program in Solana. Indeed, the token balance lives in something like a *token bag*, and that token bag is owned by the user, not the system or your smart contract!
+
+
+**PDA Signing**
+
+Since accounts live outside programs, signing is used to determine who has control of an account. Sometimes though. You want only your program to own such an account. This is achieved by PDA Signing, it is pretty finicky, but you will get used to it with time.
+
+
+**Rent**
+
+Finally, we need to pay rent for the space accounts occupied in Solana. The rent is usually paid by the signer of the transaction. Because space needs to be paid, we are incentivized as developers to make accounts are small and granular as possible.
+
+
+
+
+---
+
+
+
+# Going Further - How Does A Swap work?
+
+![orca-swap](https://cdn.hashnode.com/res/hashnode/image/upload/v1648666515914/uRYGltdHk.png)
+
+
+
+By looking at the transaction scan, we can understand what is happening without even looking at the code. Here's an example of how [ORCA](https://www.orca.so/) does it:
+![explorer-orca-swap.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648667073056/sZdesOzEY.png)
+*https://explorer.solana.com/tx/3KzBwqLYRwxafSzB8ewDYQWgtwwGYajAfxm3moxm1tHrwr3iRLkMwxtAjbMm3TKWAmAepgBZtZSeBcsQKyDC5fg5*
+
+
+We see that for a swap, we also need to interact with the Token Program:
+
+- Token Program
+  1. Transfer
+  2. Mint
+  3. Transfer
+
+As you now know, to receive tokens, you need to have the corresponding token bags first. In some cases, you will see that before the swap, there is the token bag creation:
+
+- Associated Token Account Program - Create Associated Account
+  1. SOL Transfer
+  2. Allocate
+  3. Assign
+  4. Initialize account
+- Token Program
+  1. Transfer
+  2. Mint
+  3. Transfer
+
+The swap code for orca is public and can be found here: https://github.com/orca-so/solana-program-library/blob/master/token-swap/program/src/instruction.rs.
+
+
+
+---
+
+
+
+#  Going Further - Different Staking Model
+
+**Depending on the project, the staking mode might differ in how they structure the tokens.**
+
+**[Step](https://www.step.finance)**
+
+* Input: step
+* Output: xstep
+* Reward = none
+
+**[Cropper](https://cropper.finance/)**
+
+* Input: CRP
+* Output: sCRP
+* Reward: CRP
+
+**[Raydium](https://raydium.io/)**
+
+* Input: Ray
+* Output: none
+* Reward: Ray
+
+---
+
+# Open Source Champions
+
+This article would have never seen the light without these beautiful projects:
+
+- [The Solana Cookbook](https://solanacookbook.com/)
+- [The Anchor Book](https://book.anchor-lang.com)
+- [Step Finance - Single Token Staking Github](https://github.com/step-finance/step-staking)
+- [Project Serum Stake Example](https://github.com/project-serum/stake/blob/master/tests/lockup.js)
+
+
+---
+
+# References
+
+- [Intro to blockchains programming with Solana](https://blog.mwrites.xyz/your-first-solana-program)
+- [What is a Program Derived Address](https://blog.mwrites.xyz/solana-what-is-a-program-derived-address)
+- [Solana Doc - Token Program](https://spl.solana.com/token)
+- [Solana Doc - Associated Token Account Program](https://spl.solana.com/associated-token-account)
+- [Anchor Book - CPI](https://book.anchor-lang.com/chapter_3/CPIs.html)
+- [Anchor Book - PDA Signing](https://book.anchor-lang.com/chapter_3/PDAs.html#programs-as-signers)
+- [How to use the Metaplex Token Metadata Standard](https://github.com/jacobcreech/Token-Creator)
+
+---
+
+
+
 **Associated Token Accounts or Token Bags**
 
 While in EVM, token balance is handled by the ERC20 smart contract, it is not managed by a program in Solana. Indeed, the token balance lives in something like a *token bag*, and that token bag is owned by the user, not the system or your smart contract!
@@ -938,9 +1462,467 @@ Finally, we need to pay rent for the space accounts occupied in Solana. The rent
 
 ----
 
-# 👉🏻 Part 2 Of Hell's Kitchen
+## Let's Pair-Progra-Cook A Solana Staking Program - Part 2
 
-🏎 From now on, it will be much faster since you have already mastered the key ingredients. So take a little break before tackling the next part of staking, the transfer of 🐮 from the users (the payment).
+# 📺 Previously In Hell's Kitchen
 
-When you are ready, meet you in part 2 (I need to find the link to part2 lol)
+
+This is part 2 of the [staking program](https://blog.mwrites.xyz/solana-staking-program). We are still trying to achieve the core staking feature. By trying to implement the minting part, we learned how to chop and slice token mints, token bags, CPI signing, etc... Thanks to that, we will be able to move much faster now!
+
+>  Remember, if you are an Etherean, ex etherean, or cyborg etherean-solanian 😁, please jump to the [EVM Comparison](https://blog.mwrites.xyz/solana-staking-program-part2#heading-review-andamp-evm-comparison) and copy-paste the section somewhere, and keep it along with you as you follow the article. That section was separated on purpose as I am not sure how many of you have the double skills.
+
+Let's do the second part of the staking. We now need to transfer $beef tokens from the user.
+![staking-flow-transfer.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648666462023/Cs-9w-CbM.png)
+
+
+
+# 👓 DO THIS FIRST: Zoom In
+
+**Please, please  `CMD + +`, or `view -> zoom in` at least two or three times in your browser. Unfortunately, hashnode keeps the reading area ridiculously small, even on huge screens, making the screenshots unreadable.**
+
+**Or, right-click on the screenshots and open in the new tab.**
+
+I had previously added the full code in text directly in the article, but it was just impossible to follow given the length of the code! So I decided to go for side-by-side screenshots instead. Also because of accounts, it's way better to see side by side, what your program API expects and what accounts you need to prepare on the client side.
+
+Maybe in the future, I will consider using another platform. I am thinking about a two-view or three-view side by side to look at rust, js, and diagram at the same time.
+
+
+
+# 👨🏻‍🍳 Tonight The Chef Propose
+
+**Humans have two faces, and Solanians have three.**
+
+Remember, to fully understand how a Solana program works. We better try to look at it from different glasses 👓:
+
+- The deployment part.
+- The client-side.
+- The program itself.
+
+
+**1 Pair-Progra-Cooking The Minting Feature:**
+
+*This was done in part 1.*
+
+**2 Completing the staking with the $beef transfer:**
+
+In this episode, we will make users pay $beef!
+
+**3. Unstake:**
+
+Finally, we will learn how to do the inverse operation of staking.
+
+
+# 🍭 TL;DR - [Github](https://github.com/mwrites/solana-staker)
+We are still looking at the same repo, the code in this article is not exhaustive. Instead, it will illustrate the important pieces so that you develop the mental model to build a DeFi program yourself in the future.
+
+Please don't try to copy-paste any of the code here. It probably won't compile. I have reduced the noise on purpose. However, the complete code is available [here](https://github.com/mwrites/solana-staker). Feel free to look at it along with the article or clone it locally and try it.
+
+
+#  🐮 Transfering Beef From Users
+
+### 🥒 Fourth Ingredient - Airdrop 💧
+
+**Got some beef?**
+
+Previously we have already created the🐮 token mint. Our tokens now exist in the blockchain (at least in our local ledger). It is not time to work on our program yet. Why? Our staker program takes $beef tokens and rewards our users with stake tokens. But how do users get $beef in the first place?
+
+Have you ever noticed that almost all DeFi apps have a swap feature on the home page? So if we were to build a complete DeFi app, users would start by swapping their $sol for 🐮 tokens. Then they would be able to stake their 🐮 tokens.
+
+![orca-swap](https://cdn.hashnode.com/res/hashnode/image/upload/v1648666515914/uRYGltdHk.png)
+*[Orca Swap](https://www.orca.so/)*
+
+
+**Airdrop**
+
+Since we are in Solana, users usually start with $sol, so when they go to our Staking or DEX  application, users would first need to swap their $sol for another crypto token. **To simplify this article and make testing easier, we will just airdrop the 🐮 tokens directly to users.**
+
+For our tests, we are using ourselves as guinea pig users. So you or I will be the one receiving the 🐮 tokens.
+
+> This part is not crucial to the article. However, if you want, look at  `scripts/airdrop-beef.ts` to understand how to do it.
+
+So, we usually would airdrop $beef to users before they arrive in our application. So, let's do that in the tests:
+
+```
+import { airdropBeef } from "../scripts/airdrop-beef";
+
+
+
+describe("staker program", () => {  
+  
+    before(async () => {  
+        await createMints();
+        await airdropBeef();
+	 });
+
+
+	it('Swap $🐮 for $🥩', async () => {
+		...
+	}
+}
+```
+
+
+**🏆 Achievement: Airdroping 🐮**
+
+- Users now have 🐮 in their wallets. 
+- All the preparation to finish the stake function is now done!
+
+
+### 🐮💰 Your Program Also Wants Gucci
+
+![rusty](https://cdn.hashnode.com/res/hashnode/image/upload/v1648666558061/Z4PWBDqem.png)
+
+💪 From now on, we don't need to do additional deployment stuff. We can solely focus on our staker program.
+
+One more thing before we let users send 🐮 to us, we need a beef token bag for our program. As users need token bags to hold tokens, programs also need token bags. So let's create one for our program. Since the program will own the token bag account, we will be using a [Program Derived Address](https://blog.mwrites.xyz/solana-what-is-a-program-derived-address) mapped to the address of the beef mint. 
+
+#### Rust
+
+On the left side, the implementation is virtually empty, because thanks to Anchor we can do all the work with the macros when defining `Context<CreateBeefTokenBag`.
+
+![part2-code-transfer-create-beef-bag-rust.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648707413352/_u6AY_mYV.png)
+
+The program token bag will be created with the `CreateBeefTokenBag` instruction:
+- We are creating an account from a PDA, you know this already!
+- This time, the `bump` is not necessary.
+
+  
+
+#### Deployment - Creating The Bag Account
+
+- Left side: remember, with Solana, we need to prepare the addresses of the accounts ahead of time and feed them to our program. PDAs are "found" instead of created, so let's find that address. 
+- Right side: we create an account with that program-derived address, all the other accounts are just dependencies of that `program_beef_token_bag`.
+
+![part2-code-transfer-create-beef-bag-js](https://cdn.hashnode.com/res/hashnode/image/upload/v1648708210979/mRCLhtpx0.png)
+Let's look at the left side:
+- This time, the `bump` is not necessary.
+- `payer`: Solana wonders: *" and who is gonna pay for that token bag account space?"*
+
+* The rest are required by Token Program, as we saw when we defined the `Context<CreateBeefTokenBag>.`
+
+
+
+>  In real life (what is real life?), you would actually do this in an Anchor deployment script.
+
+
+
+
+Run the test👏  `anchor test`:
+
+```shell
+    ✔ It creates the program 🐮💰 beef token bag (615ms)
+    ✔ Swap $🐮 for $🥩 (1701ms)
+
+
+  2 passing (7s)
+```
+
+
+
+**🏆 Achievement:**
+
+- We created a token bag for our program to receive 🐮 from the user.
+- Our program can now receive and store 🐮 beef tokens.
+
+
+
+### 🏗 An Attempt To Transfer
+
+Similarly to what we did for the mint instruction with the token program, let's see what the transfer looks like:
+
+```rust
+let cpi_ctx = CpiContext::new(  
+	ctx.accounts.token_program.to_account_info(),  
+	token::Transfer {  
+		from: // from which token bag?
+		authority: // do you have the authority to withdraw from ⬆️ ? 
+		to: // to which token bag?
+	}  
+);  
+token::transfer(cpi_ctx, beef_amount)?;
+
+```
+
+- `from`: is the token bag to withdraw from, meaning the user 🐮 token bag.
+- `authority`: is the authority for `from.` Solana wants to make sure we are not stealing from the users without their consent!
+- `to`: is the program token bag we will need to create below.
+
+
+
+😌 No need for a checklist this time. We already have all the ingredients necessary. We will complete all these arguments at once!
+
+
+
+
+### 🐮 Withdrawing $Beef From Users
+
+#### Rust - `token::Transfer`
+
+The left side is our implementation and the right side is the `Context<Stake>` accounts we need to define:
+
+![part2-code-transfer-transfer-rust.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648705410241/2gvpGhIy6.png)
+
+- `program_beef_token_bag`: you know the dance now, it's a PDA seeded with a mint address.
+- (right), note the additional `#[instruction(stake_mint_authority_bump: u8, program_beef_bag_bump: u8)]`.
+- (left), and also in the function: `stake(ctx: Context<Stake>, stake_mint_authority_bump: u8,  program_beef_bag_bump: u8)`
+
+
+
+#### Shall We... Test?
+
+
+![part2-code-transfer-transfer-js.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648707082571/QmX01ZoDO.png)
+
+
+
+> *Later, if you are curious about the helpers, look at the `scripts` folder.
+
+
+
+
+Run the `anchor test`:
+
+```shell
+🐮 beef Mint Address: AXyTBL1C48WEdpzpY4bc...
+🥩️ stake Mint Address: 9FgzyMYYiQew42BdVjs...
+🐮 Token Account 💰'8rn1qnW1QivKinta8rmDHsyV...' balance: 1000000000
+    ✔ It creates the program 🐮💰 beef token bag (552ms)
+    ✔ Swap $🐮 for $🥩 (2280ms)
+
+
+  2 passing (8s)
+```
+
+
+
+Checkpoint code in this branch: https://github.com/mwrites/solana-staker/tree/feature/stake-transfer-program-beef-token-bag.
+
+
+
+### 🏆 Achievement: Transfer
+
+😌😌😌 Phew... We finally put all the pieces together, the staking feature finally works!!!
+
+- We had to get a little help from the airdrop function to get users some 🐮.
+- Once users had 🐮, we noticed that the program also needed a 🐮 token bag to store SPL tokens.
+- After that, we were already familiar with all the 🥒 previous ingredients, mint, PDA, and token bags, so we could finish it in one straight line.
+
+🚀🌈👏  Huge job on getting to this checkpoint!!! We are basically done. There are no more ingredients or detours to learn about. The rest is just finishing the job.
+
+
+
+---
+
+
+
+# 🏁 Final Lap - Unstake / Redeem
+
+Now, we need to do all of this but in reverse. So what does the Unstake / Redeem of 🥩 actually do?
+
+- It should not mint but burn the received 🥩.
+
+- It should transfer back 🐮 to users.
+
+  
+
+### 🏗 An Attempt to UnStake
+
+Here's what the `token::Burn` instruction for the Token Program looks like:
+
+```rust
+token::Burn {  
+	mint: // what type of token is this?
+	to: // who is burning token?
+	authority: // who get the right to burn these?
+},
+```
+
+
+
+###  🔥 Burning Users' $Stakes
+
+* Left side: implementation.
+* Right side: what kind of accounts the API expects.
+
+![part2-code-unstake-burn-rust.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648706164939/OPckgAsJR.png)
+
+Let's discuss `token::Burn` (left side):
+
+- `to`: I would have called it a `from` as in "token bag to burn from" instead, but basically, that's the token bag we want to burn.
+
+- `authority`: Solana wants to make sure the person who is unstaking also controls that token bag.
+
+  
+
+
+###  🤠 Refunding $Beef To Users
+
+**Rust-Side**
+
+
+
+For the transfer, it's pretty much the same thing we did for the stake but inversing the recipient and the destination. On the left side, we do the implementation and on the right side we define the `Context<UnStake>`:
+
+![part2-code-unstake-transfer-rust.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648706309351/oHljt1S7C.png)
+
+- The `Context<UnStake>`, is a little similar to the Stake's one but we are mostly interested about beef mint and beef bags this time.
+
+
+
+Let's zoom in, on the signing, it's quite similar to what we did in `fn stake()` just using `beef_mint` and `beef_token_bag` instead:
+
+```rust
+  // PDA Signing: same as how we did  in `fn stake()`  
+let stake_mint_address= ctx.accounts.beef_mint.key();  
+let seeds = &[beef_mint_address.as_ref(), &[program_beef_bag_bump]];  
+let signer = [&seeds[..]];  
+  
+let cpi_ctx = CpiContext::new_with_signer(  // NEW
+	 ctx.accounts.token_program.to_account_info(),  
+	 token::Transfer {  
+		 from: ctx.accounts.program_beef_token_bag.to_account_info(),  
+		 authority: ctx.accounts.program_beef_token_bag.to_account_info(),  
+		 to: ctx.accounts.user_beef_token_bag.to_account_info()  
+	 },  
+	 &signer  
+);
+```
+
+- `CpiContext::new_with_signer`: when we did the transfer call in `stake,` we needed the user's signature. Since the token comes from the vault, we need the program to sign this time.
+
+
+
+**Client-Side**
+
+We can look at the right side, to see what are the expected accounts. So that, on the left side, we prepare the addresses of the accounts and feed them to the program:
+
+
+![part2-code-unstake-js.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648706709411/3ToaNYczq.png)
+
+
+
+ `anchor tests`:
+
+ ```shell
+ 🐮 beef Mint Address: AXyTBL1C48WEdpzpY...
+🥩️ stake Mint Address: 9FgzyMYYiQew42BdVjsK...
+🐮 Token Account 💰'8rn1qnW1QivKinta8rmDH...' balance: 1000000000
+    ✔ It creates the program 🐮💰 beef token bag (531ms)
+    ✔ Swaps $🐮 for $🥩 (2090ms)
+    ✔ It redeems 🥩 for 🐮 (1557ms)
+
+
+  3 passing (8s)
+ ```
+
+Checkpoint code is in this branch: https://github.com/mwrites/solana-staker/tree/feature/unstake.
+
+
+
+---
+
+
+
+# 🎬 And Cut
+
+Tremendous job on making it! 💪
+
+Users can now stake and unstake tokens. The only remaining part is the math on how to distribute tokens. One easy solution is to just divide by the total supply, but other ways exist. I will let you figure out this part.
+
+We started from a draft of the minting which led us to learn about several ingredients that we needed:
+
+1. Creating a Mint.
+2. Signing with a PDA.
+3. Associated Token Accounts.
+
+These 🥒 ingredients will be the foundation of your core skills which you can use to make new recipes apps!
+
+Learning how to prepare and chop these ingredients was the most challenging part, but after mastering these, we were able to quickly unroll the rest, the transfer, and the redeeming feature.
+
+🌈 Going further, the front-end is basically done. You just have to take the js code from the tests and let users connect their wallets with a [wallet-adapter](https://github.com/solana-labs/wallet-adapter). Not sure how to do it? 
+- Take a look at this [front-end walkthrough](https://blog.mwrites.xyz/solana-dapp-frontendl). You also might want to add the swap feature and avoid the awkward $beef airdrop we did.
+- Or you can try to let users stake $sol instead of 🐮, try to implement it, and see what's different about staking $sol.
+- Also, you might want to name your token by adding token, Jacob Creech explains [how to use the metaplex token metadata standard](https://github.com/jacobcreech/Token-Creator#adding-the-token-metadata)
+
+Grab a coffee, a beer, water, look at the sunshine take a breath, pat yourself, look at how handsome or pretty you are in the mirror 🤩. Then, come back for the next sections below!
+
+
+
+---
+
+
+
+# 🎓 Review & EVM Comparison
+
+**The Consequence Of Accounts**
+
+Comparing with the [solidity version](https://solidity-by-example.org/defi/staking-rewards/). You might notice that the Solana version is much more involved. If we can resume it in one word, that word is *Accounts*. You might have seen the phrase *" Solana programs are stateless"*. It took me a while to really, I mean, really understand what this involves. Basically, it means programs are dumb!
+
+So, programs don't know anything. They are just machine processing data. So when you want to talk to programs, you want them to process something. But they have no idea what data you are talking about, so because of that, you need to always provide everything to these processors:
+
+1. The first consequence of this is that data (accounts) need to be provided with each instruction, which makes the code longer to write.
+2. The second consequence is that because accounts are independent of programs, they need to be signed for access control, which again makes the code longer to write.
+
+**It's not a program->accounts, it's program->accounts->signer**
+
+Because of these two reasons, accounts introduce a new depth. For example, when you want to talk to a program, you want to give an account and not only the account but also the account's signer. So whenever you want to do something, you first need to get the accounts and make sure you have the appropriate signing in place. Then, finally, you can do something with the account.
+
+
+**ERC20 Contracts**
+
+The equivalent to ERC20 contracts in Solana is SPL Tokens. However, SPL Tokens are not smart contracts but accounts. So instead of creating a new smart contract (program), we register a new account that defines our token with the SPL Token Program, the centralized authority for managing tokens.
+
+
+**Associated Token Accounts or Token Bags**
+
+While in EVM, token balance is handled by the ERC20 smart contract, it is not managed by a program in Solana. Indeed, the token balance lives in something like a *token bag*, and that token bag is owned by the user, not the system or your smart contract!
+
+
+**PDA Signing**
+
+Since accounts live outside programs, signing is used to determine who has control of an account. Sometimes though. You want only your program to own such an account. This is achieved by PDA Signing, it is pretty finicky, but you will get used to it with time.
+
+
+**Rent**
+
+Finally, we need to pay rent for the space accounts occupied in Solana. The rent is usually paid by the signer of the transaction. Because space needs to be paid, we are incentivized as developers to make accounts are small and granular as possible.
+
+
+
+
+---
+
+
+
+# Going Further - How Does A Swap work?
+
+![orca-swap](https://cdn.hashnode.com/res/hashnode/image/upload/v1648666515914/uRYGltdHk.png)
+
+
+
+By looking at the transaction scan, we can understand what is happening without even looking at the code. Here's an example of how [ORCA](https://www.orca.so/) does it:
+![explorer-orca-swap.png](https://cdn.hashnode.com/res/hashnode/image/upload/v1648667073056/sZdesOzEY.png)
+*https://explorer.solana.com/tx/3KzBwqLYRwxafSzB8ewDYQWgtwwGYajAfxm3moxm1tHrwr3iRLkMwxtAjbMm3TKWAmAepgBZtZSeBcsQKyDC5fg5*
+
+
+We see that for a swap, we also need to interact with the Token Program:
+
+- Token Program
+  1. Transfer
+  2. Mint
+  3. Transfer
+
+As you now know, to receive tokens, you need to have the corresponding token bags first. In some cases, you will see that before the swap, there is the token bag creation:
+
+- Associated Token Account Program - Create Associated Account
+  1. SOL Transfer
+  2. Allocate
+  3. Assign
+  4. Initialize account
+- Token Program
+  1. Transfer
+  2. Mint
+  3. Transfer
+
+The swap code for orca is public and can be found here: https://github.com/orca-so/solana-program-library/blob/master/token-swap/program/src/instruction.rs
 
