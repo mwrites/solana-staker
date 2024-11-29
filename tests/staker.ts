@@ -18,8 +18,8 @@ describe("staker", () => {
   before(async () => {
     await ignoreAlreadyInUse(async () => {
       await createMints();
-      await airdropBeef();
     });
+    await airdropBeef();
   });
 
   it("It creates the program 🐮💰 beef token bag", async () => {
