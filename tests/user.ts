@@ -5,7 +5,7 @@ import {
   userWallet,
 } from "../scripts/config";
 import { TokenHelper } from "./token_helper";
-import { Wallet } from "@project-serum/anchor";
+import { Wallet } from "@coral-xyz/anchor";
 
 class User {
   beefToken: TokenHelper;
