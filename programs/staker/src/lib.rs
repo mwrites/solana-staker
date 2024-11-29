@@ -1,20 +1,20 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("35TReuZfcStbybccpTzSrNRrZV8ukanD92hH7d39wixe");
 
 #[program]
 pub mod staker {
-    // REPLACE ADDRESS of stake mint by running solana address -k .keys/stake_mint.json
-    pub const STAKE_MINT_ADDRESS: &str = "9FgzyMYYiQew42BdVjsKNHUeXDpP4CaK1rFLMQndf1xE";
-    // REPLACE ADDRESS of beef mint by running solana address -k .keys/beef_mint.json
-    pub const BEEF_MINT_ADDRESS: &str = "AXyTBL1C48WEdpzpY4bcDNsG4B2N918zy2cYsiQFKGBf";
-
-
     use super::*;
 
+    // REPLACE ADDRESS of stake mint by running solana address -k keys_for_test/stake_mint.json
+    pub const STAKE_MINT_ADDRESS: &str = "5V4x2GFijNcMXkwRm7dfqN1Rb5RAGx5yk26M15Ttfpn";
+    // REPLACE ADDRESS of beef mint by running solana address -k keys_for_test/beef_mint.json
+    pub const BEEF_MINT_ADDRESS: &str = "iS9kEZm62NRSrZjF8xGDBbfj7qWeEHJwJHvq6hVKwNa";
+
+    
     pub fn create_beef_token_bag(
-        ctx: Context<CreateBeefTokenBag>
+        _ctx: Context<CreateBeefTokenBag>
     ) -> Result<()> {
         Ok(())
     }
@@ -22,7 +22,7 @@ pub mod staker {
     pub fn stake(
         ctx: Context<Stake>,
         stake_mint_authority_bump: u8,
-        program_beef_bag_bump: u8,
+        _program_beef_bag_bump: u8,
         beef_amount: u64
     ) -> Result<()> {
 
@@ -89,7 +89,7 @@ pub mod staker {
             ctx.accounts.token_program.to_account_info(),
             token::Burn {
                 mint: ctx.accounts.stake_mint.to_account_info(),
-                to: ctx.accounts.user_stake_token_bag.to_account_info(),
+                from: ctx.accounts.user_stake_token_bag.to_account_info(),
                 authority: ctx.accounts.user_stake_token_bag_authority.to_account_info(),
             },
         );

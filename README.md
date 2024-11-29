@@ -94,25 +94,25 @@ git clone git@github.com:mwrites/solana-staker.git
 
 FYI, I have added the dependencies for the SPL Token Program in `Cargo.toml`:
 ```
-anchor-spl = "0.22.1"
+anchor-spl = "0.29.0"
 ```
 
 And in `package.json`:
 ```json
 {
 	"dependencies": {  
-		"@project-serum/anchor": "^0.22.1",  
-		"@solana/spl-token": "^0.2.0"  
+		"@coral-xyz/anchor": "^0.29.0",
+        "@solana/spl-token": "^0.4.0"
 	},  
 	"devDependencies": {  
-		"@types/chai": "^4.3.0",  
-		 "@types/mocha": "^9.0.0",  
-		 "chai": "^4.3.4",  
-		 "chai-as-promised": "^7.1.1",  
-		 "mocha": "^9.0.3",  
-		 "ts-mocha": "^8.0.0",  
-		 "ts-node": "^10.7.0",  
-		 "typescript": "^4.6.2"  
+		"chai": "^4.3.4",
+        "mocha": "^9.0.3",
+        "ts-mocha": "^10.0.0",
+        "@types/bn.js": "^5.1.0",
+        "@types/chai": "^4.3.0",
+        "@types/mocha": "^9.0.0",
+        "typescript": "^4.3.5",
+        "prettier": "^2.6.2"
 	},
 }
 ```
@@ -271,11 +271,7 @@ Remember to not confuse yourself between an account and an address. An account i
 
 **🧙‍♀️ Remember, we are switching to the Solana magician hat here because the mint needs to be created even before our stake program exists.**
 
-First, let's create 3 new keypairs, make sure to not commit these to Github:
-```shell
-solana-keygen new --outfile .keys/beef_mint.json
-solana-keygen new --outfile .keys/stake_mint.json
-```
+I have already prepared two keys for the mints in the `keys_for_test` folder, make sure to use your own for prod!
 - We prepare two keys for the mints so that we can identify them by their public address.
 - We also need another key to set the owner of these mints.
 
@@ -294,7 +290,7 @@ import {
   
 const createMints = async () => {  
     const beefMintAddress = await createMintAcct(  
-		beefMintKeypair,  // .keys/beef_mint.json
+		beefMintKeypair,  // keys_for_test/beef_mint.json
 		beefMintKeypair.publicKey  
 	 )  
   
@@ -305,7 +301,7 @@ const createMints = async () => {
 	//     program.programId
 	// );  
 	const stakeMintAddress = await createMintAcct(  
-	    stakeMintKeypair,  // .keys/stake_mint.json
+	    stakeMintKeypair,  // keys_for_test/stake_mint.json
 		stakePDA // see diagram below to understand why we are doing this
 	)  
   
@@ -389,7 +385,7 @@ token::MintTo {
 `programs/staking/src/lib.rs`:
 ```rust
 ...
-// REPLACE ADDRESS of stake mint by running solana address -k .keys/stake_mint.json  
+// REPLACE ADDRESS of stake mint by running solana address -k keys_for_test/stake_mint.json  
 pub const STAKE_MINT_ADDRESS: &str = "9FgzyMYYiQew42B...";
 
 fn stake(ctx: Context<Stake>, beef_amount: u64) -> Result<()> {
@@ -429,7 +425,7 @@ pub struct Stake<'info> {
 
 Make sure to replace `STAKE_MINT_ADDRESS.` You can find that address by running:
 ```shell
-solana address -k .keys/stake_mint.js
+solana address -k keys_for_test/stake_mint.js
 ```
 
 
@@ -529,7 +525,7 @@ The same again in js (we already did this when we created the stakeMint account)
 	//     program.programId
 	// );  
 	const stakeMintAddress = await createMintAcct(  
-	    stakeMintKeypair,  // .keys/stake_mint.json
+	    stakeMintKeypair,  // keys_for_test/stake_mint.json
 		stakePDA // see diagram above to understand why we are doing this
 	)
 ```

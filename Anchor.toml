@@ -1,14 +1,15 @@
 [features]
 seeds = false
 [programs.localnet]
-staker = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+staker = "7nerEma6QFA1WKrchArZhjn48q7buivNByLwHX9wHzQN"
 
 [registry]
-url = "https://anchor.projectserum.com"
+url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
-wallet = "/Users/matanwrites/.config/solana/id.json"
+# u can get ur own free cluster here: https://www.helius.dev
+cluster = 'localnet'
+wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

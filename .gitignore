@@ -7,3 +7,4 @@ node_modules
 
 .keys
 test-ledger
+yarn-error.log
