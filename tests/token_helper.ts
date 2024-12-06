@@ -18,10 +18,8 @@ class TokenHelper {
     return (await getMint(connection, this.mint)).address;
   };
 
-  balance = async (tokenBag: PublicKey) => {
-    return parseInt(
-      (await connection.getTokenAccountBalance(tokenBag)).value.amount
-    );
+  balance = async (tokenBag: PublicKey): Promise<bigint> => {
+    return BigInt((await connection.getTokenAccountBalance(tokenBag)).value.amount);
   };
 
   getOrCreateTokenBag = async (
@@ -38,16 +36,5 @@ class TokenHelper {
     );
   };
 }
-
-// const run = async () => {
-//     try {
-//         await airdropBeef();
-//         process.exit(0);
-//     } catch (error) {
-//         console.error(error);
-//         process.exit(1);
-//     }
-// };
-// run();
 
 export { TokenHelper };

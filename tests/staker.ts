@@ -15,6 +15,9 @@ import { airdropBeef } from "../scripts/airdrop-beef";
 import { TokenHelper } from "./token_helper";
 
 describe("staker", () => {
+  const beefTokenHelper = new TokenHelper(beefMintAddress);
+  const user = new User();
+
   before(async () => {
     await ignoreAlreadyInUse(async () => {
       await createMints();
@@ -42,14 +45,12 @@ describe("staker", () => {
         .signers([])
         .rpc();
 
-      const tokenHelper = new TokenHelper(beefMintAddress);
-      expect(await tokenHelper.balance(beefPDA)).to.be.eql(0);
+      expect(await beefTokenHelper.balance(beefPDA)).to.be.eql(BigInt(0));
     });
   });
 
   it("It swaps $🐮 for $🥩", async () => {
     // 0. Prepare Token Bags
-    const user = new User();
     await user.getOrCreateStakeTokenBag();
     await user.getOrCreateBeefTokenBag();
 
@@ -89,17 +90,15 @@ describe("staker", () => {
 
     // 3. Tests
     // We expect the user to have received 5_000 $🥩
-    expect(await user.stakeBalance()).to.be.eql(userStakes + 5_000);
+    expect(await user.stakeBalance()).to.be.eql(userStakes + BigInt(5_000));
 
     // We expect the user to have paid 5_000 $🐮 to the program.
-    expect(await user.beefBalance()).to.be.eql(userBeefs - 5_000);
-    const tokenHelper = new TokenHelper(beefMintAddress);
-    expect(await tokenHelper.balance(beefBagPDA)).to.be.eql(5_000);
+    expect(await user.beefBalance()).to.be.eql(userBeefs - BigInt(5_000));
+    expect(await beefTokenHelper.balance(beefBagPDA)).to.be.eql(BigInt(5_000));
   });
 
   it("It redeems 🥩 for 🐮", async () => {
     // 0. Prepare Token Bags
-    const user = new User();
     await user.getOrCreateStakeTokenBag();
     await user.getOrCreateBeefTokenBag();
     // For the TRANSFER
@@ -134,10 +133,10 @@ describe("staker", () => {
 
     // 3. Tests
     // We expect the user to have redeem $🥩 to the program.
-    expect(await user.stakeBalance()).to.be.eql(userStakes - 5_000);
+    expect(await user.stakeBalance()).to.be.eql(userStakes - BigInt(5_000));
 
     // We expect the user to have received 5_000 beef $🐮 back.
-    expect(await user.beefBalance()).to.be.eql(userBeefs + 5_000);
+    expect(await user.beefBalance()).to.be.eql(userBeefs + BigInt(5_000));
   });
 });
 

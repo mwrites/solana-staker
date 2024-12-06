@@ -25,15 +25,4 @@ const airdropBeef = async () => {
   );
 };
 
-// const run = async () => {
-//     try {
-//         await airdropBeef();
-//         process.exit(0);
-//     } catch (error) {
-//         console.error(error);
-//         process.exit(1);
-//     }
-// };
-// run();
-
 export { airdropBeef };
